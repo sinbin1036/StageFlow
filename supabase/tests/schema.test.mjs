@@ -101,12 +101,16 @@ await as('authenticated', ADMIN, `update public.events set status = 'PUBLISHED' 
 await as('authenticated', ADMIN, `update public.events set status = 'LIVE' where id = $1`, [ev.id]);
 await as('authenticated', ADMIN, `update public.performance_entries set status = 'PERFORMING' where id = $1`, [mainIds[0]]);
 ok('공연 중인 곡은 하나뿐', /duplicate key|unique/.test(await err('authenticated', ADMIN, `update public.performance_entries set status = 'PERFORMING' where id = $1`, [mainIds[1]])));
-ok('본 공연이 안 끝났으면 앵콜을 열 수 없다',
-  /MAIN_SET_NOT_FINISHED/.test(await err('authenticated', ADMIN, `update public.events set status = 'ENCORE' where id = $1`, [ev.id])));
-await as('authenticated', ADMIN, `update public.performance_entries set status = 'COMPLETED' where event_id = $1 and not is_encore and id <> $2`, [ev.id, mainIds[1]]);
-await as('authenticated', ADMIN, `update public.performance_entries set status = 'CANCELLED' where id = $1`, [mainIds[1]]);
-await as('authenticated', ADMIN, `update public.events set status = 'ENCORE' where id = $1`, [ev.id]);
-ok('본 공연이 모두 완료 · 취소되면 앵콜을 연다', (await one(`select status from public.events where id = $1`, [ev.id])).status === 'ENCORE');
+const mainLeft = async () =>
+  (await one(`select count(*)::int c from public.performance_entries where event_id = $1 and not is_encore and status not in ('COMPLETED','CANCELLED')`, [ev.id])).c;
+const openEncore = () => err('authenticated', ADMIN, `update public.events set status = 'ENCORE' where id = $1`, [ev.id]);
+ok(`남은 본 공연이 ${await mainLeft()}곡이면 앵콜을 열 수 없다`, /MAIN_SET_NOT_FINISHED/.test(await openEncore()));
+await as('authenticated', ADMIN, `update public.performance_entries set status = 'COMPLETED' where id = any($1::uuid[])`, [mainIds.slice(0, mainIds.length - 6)]);
+ok('6곡 남아도 앵콜을 열 수 없다', (await mainLeft()) === 6 && /MAIN_SET_NOT_FINISHED/.test(await openEncore()));
+await as('authenticated', ADMIN, `update public.performance_entries set status = 'CANCELLED' where id = $1`, [mainIds[mainIds.length - 6]]);
+ok('5곡 남으면 앵콜을 연다 (취소 곡은 세지 않음)', (await mainLeft()) === 5 && (await openEncore()) === null);
+ok('앵콜을 열어도 남은 본 공연 5곡은 대기 상태로 그대로 남는다',
+  (await one(`select count(*)::int c from public.performance_entries where event_id = $1 and not is_encore and status = 'SCHEDULED' and order_index is not null`, [ev.id])).c === 5);
 
 console.log('\n[앵콜]');
 ok('앵콜은 한 번에 한 곡 (2곡은 INVALID_INPUT)',

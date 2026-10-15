@@ -8,7 +8,7 @@ import { ClosedView, EncoreView, EndedView, LiveView, OpenView, PublishedView } 
 
 // 행사 메인 화면. 행사 단계(status)에 따라 화면이 바뀌고, 관리자가 바꾸면 실시간으로 따라간다.
 export function EventApp({ initial }: { initial: EventSnapshot }) {
-  const snapshot = useLiveSnapshot(initial);
+  const [snapshot] = useLiveSnapshot(initial);
   const myIds = useMySubmissions(snapshot.event.public_code);
   const view = buildView(snapshot, myIds);
   const props = { snapshot, view };
