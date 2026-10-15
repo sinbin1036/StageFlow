@@ -408,6 +408,14 @@ Supabase가 DB·인증·Realtime을 맡지만, 로그인 없는 참가자를 다
 
 ## 로컬 개발
 
+처음 한 번 `.env.example`을 `.env.local`로 복사하고 Supabase 키를 채웁니다. (대시보드 → Project Settings → API Keys)
+
+| 변수 | 용도 |
+| --- | --- |
+| `NEXT_PUBLIC_SUPABASE_URL` | Supabase 프로젝트 주소 |
+| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | 참가자 화면의 공개 읽기 · Realtime 구독 |
+| `SUPABASE_SERVICE_ROLE_KEY` | **서버 전용.** 참가 신청 · 수정 · 삭제 DB 함수 호출 |
+
 ```bash
 npm install
 npm run dev        # 개발 서버 (http://localhost:3000)
@@ -416,7 +424,20 @@ npm run start      # 빌드 결과 실행
 npm run lint       # ESLint
 npm run typecheck  # 타입 체크
 npm run test:db    # DB 스키마 시나리오 테스트 (Docker 불필요)
+npm run db:types   # 연결된 Supabase 스키마로 TypeScript 타입 다시 생성
 ```
+
+### 참가자 화면
+
+| 경로 | 화면 |
+| --- | --- |
+| `/events/{publicCode}` | 행사 메인. 행사 단계에 따라 신청된 곡 목록 · 공연 순서 · 앵콜 · 최종 셋리스트로 바뀌고, Realtime으로 실시간 갱신 |
+| `/events/{publicCode}/apply` | 곡 신청 (모집 중) · 앵콜 신청 (앵콜 중) |
+| `/events/{publicCode}/done/{submissionId}` | 신청 완료 |
+| `/events/{publicCode}/edit/{submissionId}` | PIN 확인 → 수정 · 삭제 |
+| `/events/{publicCode}/find` | 내 신청 찾기 (PIN 없이 MY 표시) |
+
+카카오톡 링크 미리보기 봇(`kakaotalk-scrap`)은 `next.config.ts`의 `htmlLimitedBots`에 추가해 두었습니다. 이 봇은 `<head>`의 메타데이터만 읽기 때문에, 스트리밍 대신 한 번에 렌더링해야 미리보기에 행사 제목이 나옵니다.
 
 ### Supabase
 
