@@ -47,10 +47,10 @@ export function removeMySubmission(publicCode: string, id: string) {
   write(publicCode, read(publicCode).filter((v) => v !== id));
 }
 
-// "이게 나예요": 본 공연 신청은 하나만 내 것으로 표시하고, 앵콜 신청은 그대로 둔다
-export function replaceMyMainSubmission(publicCode: string, id: string, mainIds: string[]) {
+// "이게 나예요": 본 공연 신청 표시를 고른 것들로 바꾼다(빈 목록이면 모두 지움). 앵콜 신청은 그대로 둔다
+export function replaceMyMainSubmissions(publicCode: string, ids: string[], mainIds: string[]) {
   const main = new Set(mainIds);
-  write(publicCode, [...read(publicCode).filter((v) => !main.has(v)), id]);
+  write(publicCode, [...read(publicCode).filter((v) => !main.has(v)), ...ids]);
 }
 
 export function useMySubmissions(publicCode: string) {
