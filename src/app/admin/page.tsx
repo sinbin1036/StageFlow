@@ -22,10 +22,15 @@ export default function AdminHome() {
 
 async function Events() {
   const { supabase, user } = await requireAdmin();
-  const { data: events } = await supabase
-    .from("events")
-    .select("id, title, event_date, venue, status, submissions(count), performance_entries(count)")
-    .order("event_date", { ascending: false });
+  // performance_entries는 events와 직접 FK가 없어(submissions를 거침) 함께 붙여 읽을 수 없다. 곡 수는 따로 센다.
+  const [{ data: events, error }, { data: entries, error: entriesError }] = await Promise.all([
+    supabase.from("events").select("id, title, event_date, venue, status, submissions(count)").order("event_date", { ascending: false }),
+    supabase.from("performance_entries").select("event_id"),
+  ]);
+  if (error) throw error;
+  if (entriesError) throw entriesError;
+  const songsByEvent = new Map<string, number>();
+  for (const e of entries ?? []) songsByEvent.set(e.event_id, (songsByEvent.get(e.event_id) ?? 0) + 1);
 
   return (
     <>
@@ -53,7 +58,7 @@ async function Events() {
         {(events ?? []).length === 0 && <p className="text-sm font-semibold">아직 만든 행사가 없어요.</p>}
         {(events ?? []).map((e) => {
           const subs = (e.submissions as unknown as { count: number }[])[0]?.count ?? 0;
-          const songs = (e.performance_entries as unknown as { count: number }[])[0]?.count ?? 0;
+          const songs = songsByEvent.get(e.id) ?? 0;
           return (
             <Link
               key={e.id}
