@@ -417,6 +417,7 @@ Supabase가 DB·인증·Realtime을 맡지만, 로그인 없는 참가자를 다
 | `NEXT_PUBLIC_SUPABASE_URL` | Supabase 프로젝트 주소 |
 | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | 참가자 화면의 공개 읽기 · Realtime 구독 |
 | `SUPABASE_SERVICE_ROLE_KEY` | **서버 전용.** 참가 신청 · 수정 · 삭제 DB 함수 호출 |
+| `NEXT_PUBLIC_SITE_URL` | 배포 주소 (`https://hid-stageflow.vercel.app`). 카톡 미리보기 이미지 같은 절대 주소에 사용 |
 
 ```bash
 npm install
@@ -521,6 +522,13 @@ npx supabase db reset  # 마이그레이션 + seed 다시 적용
 | `INVALID_INPUT` | 입력 형식 오류 (PIN 4자리, 공연자 1~10명, 곡 수 등) |
 | `MAIN_SET_NOT_FINISHED` | 본 공연이 6곡 이상 남았는데 앵콜을 열려고 함 |
 | `FORBIDDEN` | 관리자가 아님 |
+
+## 배포 (Vercel)
+
+- 주소: https://hid-stageflow.vercel.app (참가자 `/events/{코드}`, 관리자 `/admin`)
+- `main`에 머지하면 자동 배포됩니다.
+- Vercel 프로젝트 환경변수에 위 4개를 등록합니다. `NEXT_PUBLIC_`으로 시작하는 값은 빌드 때 들어가므로, 바꾸면 다시 배포해야 반영됩니다.
+- 서버 코드는 `vercel.json`의 `regions: ["icn1"]`로 **서울**에서 실행합니다. Supabase도 서울 리전이라, 다른 리전에서 실행하면 관리자 버튼 하나에 DB 왕복이 여러 번 태평양을 건너 수 초씩 느려집니다.
 
 ## 커밋 · PR 규칙
 
