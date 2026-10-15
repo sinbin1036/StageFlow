@@ -1,0 +1,4 @@
+#!/usr/bin/env bash
+# commit-msg — 커밋 메시지가 "type: 제목" 규칙을 따르는지 검사한다.
+# 설치(한 번만): git config core.hooksPath .githooks && git config commit.template .gitmessage
+bash "$(git rev-parse --show-toplevel)/scripts/ci/commit-lint.sh" --file "$1"

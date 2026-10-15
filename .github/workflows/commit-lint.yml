@@ -1,0 +1,32 @@
+name: commit-lint
+
+# main 외 브랜치에 push 된 커밋 메시지가 "type: 제목" 규칙을 따르는지 검사한다.
+# main 에서 merge 해 온 커밋과 Merge 커밋은 검사하지 않는다.
+on:
+  push:
+    branches-ignore: [main]
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Fetch main
+        run: git fetch --no-tags origin '+refs/heads/main:refs/remotes/origin/main'
+
+      - name: Check commit messages
+        env:
+          BEFORE: ${{ github.event.before }}
+          AFTER: ${{ github.sha }}
+        run: |
+          # 새 브랜치의 첫 push 는 before 가 0000… 이므로 main 이후 커밋만 본다
+          if [ "$BEFORE" = "0000000000000000000000000000000000000000" ]; then
+            bash scripts/ci/commit-lint.sh --range "$AFTER" ^origin/main
+          else
+            bash scripts/ci/commit-lint.sh --range "$AFTER" "^$BEFORE" ^origin/main
+          fi
