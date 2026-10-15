@@ -106,7 +106,7 @@ StageFlow의 사용자는 **관리자**와 **일반 참가자** 두 종류뿐입
 | | 관리자 (운영진) | 일반 참가자 |
 | --- | --- | --- |
 | 대상 | 동아리 회장, 간부, 버스킹 운영진 | 버스킹에 참가하는 누구나 |
-| 로그인 | **필요** (Supabase Auth) | **불필요** |
+| 로그인 | **필요** (아이디 + 비밀번호, Supabase Auth) | **불필요** |
 | 접근 경로 | 관리자 화면 | 공유받은 행사 링크 `/events/{publicCode}` |
 | 할 수 있는 일 | 행사 생성, 행사 단계 전환, 신청 목록 관리, 신청 수정 · 삭제 · 추가, 참가 취소 처리, 순서 편성 · 변경 · 공개, 현재 공연자 지정, 공연 완료 처리, 앵콜 열기 · 관리 | 참가곡 신청, 모집 중 내 신청 수정 · 삭제 (PIN), 신청된 곡 목록 · 공연 순서 · 현재 공연자 · 다음 공연자 · 내 순서 확인, 앵콜 신청 · 수정 (PIN) |
 
@@ -255,8 +255,12 @@ Submission 52 / PIN 0000   ← 같은 PIN이어도 충돌하지 않음
 
 ```
 Event 1 ── N Submission 1 ── N PerformanceEntry
-                 └── 1 SubmissionSecret
+                 └── 0..1 SubmissionSecret
+
+Admin (Supabase Auth 사용자 중 운영진)
 ```
+
+스키마는 `supabase/migrations/`에 있습니다.
 
 ### `events`
 
@@ -291,11 +295,15 @@ Event 1 ── N Submission 1 ── N PerformanceEntry
 | `id` | PK |
 | `event_id` | FK → `events.id` |
 | `submission_id` | FK → `submissions.id` (신청 삭제 시 함께 삭제) |
+| `is_encore` | 앵콜 곡 여부 (`submissions.is_encore`와 같은 값, 복합 FK로 보장) |
 | `artist` | 아티스트명 |
 | `song_title` | 곡 제목 |
-| `order_index` | 공연 순서 (편성 전에는 `null`) |
+| `order_index` | 공연 순서 (편성 전에는 `null`). 본 공연과 앵콜이 **각각 1부터** 매겨집니다 |
 | `status` | 엔트리 상태 |
 | `created_at` / `updated_at` | 생성 · 수정 시각 |
+
+- 같은 행사 · 같은 구분(본 공연/앵콜) 안에서 `order_index`는 겹칠 수 없습니다.
+- 한 행사에서 `PERFORMING`인 곡은 하나뿐입니다.
 
 `submissions`와 `performance_entries`는 공개 조회와 Realtime 구독 대상이므로 **민감한 값을 두지 않습니다.**
 
@@ -309,7 +317,16 @@ Event 1 ── N Submission 1 ── N PerformanceEntry
 | `edit_pin_hash` | 수정 PIN(숫자 4자리) 해시 (원문 저장 안 함) |
 | `created_at` / `updated_at` | 생성 · 수정 시각 |
 
-본 공연 신청과 앵콜 신청 모두 PIN을 가집니다.
+참가자가 낸 신청은 본 공연 · 앵콜 모두 PIN을 가집니다. 관리자가 현장에서 직접 추가한 신청은 PIN이 없어 행이 없습니다.
+
+### `admins`
+
+운영진으로 등록된 Supabase Auth 사용자입니다. 여기 있는 사용자만 관리자 기능(행사 · 신청 · 순서 쓰기)을 쓸 수 있습니다.
+
+| 필드 | 설명 |
+| --- | --- |
+| `user_id` | PK, FK → `auth.users.id` |
+| `created_at` | 등록 시각 |
 
 ### 엔트리 상태
 
@@ -398,7 +415,73 @@ npm run build      # 프로덕션 빌드
 npm run start      # 빌드 결과 실행
 npm run lint       # ESLint
 npm run typecheck  # 타입 체크
+npm run test:db    # DB 스키마 시나리오 테스트 (Docker 불필요)
 ```
+
+### Supabase
+
+| 경로 | 내용 |
+| --- | --- |
+| `supabase/migrations/` | 스키마 · RLS · Realtime · PIN 처리 함수 |
+| `supabase/seed.sql` | 로컬 개발용 샘플 데이터 (디자인 시안과 같은 행사, 샘플 PIN `0000`) |
+| `supabase/tests/` | PGlite로 마이그레이션을 적용해 권한 · 단계 규칙을 확인하는 테스트 |
+
+**호스팅 Supabase 프로젝트에 적용**
+
+```bash
+npx supabase login
+npx supabase link --project-ref <프로젝트 ref>
+npx supabase db push
+```
+
+**관리자 등록**
+
+관리자는 **아이디 + 비밀번호**로 로그인합니다. 일반 회원가입은 막혀 있고, 운영진 계정은 직접 만들어 등록합니다.
+
+Supabase Auth는 이메일 또는 전화번호가 필요하므로, 아이디는 내부적으로 `<아이디>@stageflow.local` 형태의 주소로 저장합니다. 로그인 화면에서는 아이디만 입력하고, 앱이 뒤에 `@stageflow.local`을 붙여 로그인합니다. 실제 메일은 보내지 않습니다.
+
+1. 대시보드 → Authentication → Sign In / Providers에서 **"Allow new users to sign up"을 끕니다.** (로컬은 `supabase/config.toml`에서 이미 꺼져 있습니다.)
+2. 대시보드 → Authentication → Users → **Add user → Create new user**
+   - Email: `<아이디>@stageflow.local` (예: `hid_president@stageflow.local`)
+   - Password: 비밀번호
+   - **Auto Confirm User** 체크 (확인 메일을 받을 수 없는 주소이므로)
+3. SQL Editor에서 관리자로 등록합니다.
+
+```sql
+insert into public.admins (user_id)
+select id from auth.users where email = '<아이디>@stageflow.local';
+```
+
+비밀번호를 잊으면 대시보드 → Authentication → Users에서 해당 계정의 비밀번호를 다시 설정합니다. (메일로 비밀번호 찾기는 지원하지 않습니다.)
+
+**로컬 Supabase (Docker 필요)**
+
+```bash
+npx supabase start     # 로컬 Supabase 실행
+npx supabase db reset  # 마이그레이션 + seed 다시 적용
+```
+
+### DB 함수
+
+참가자 쓰기는 테이블에 직접 하지 않고, Next.js 서버가 `service_role`로 아래 함수를 호출합니다. 함수가 행사 단계와 PIN을 확인하고, 실패하면 오류 코드를 돌려줍니다.
+
+| 함수 | 용도 |
+| --- | --- |
+| `create_submission(public_code, performers, songs, pin)` | 신청. `OPEN`이면 본 공연(최대 10곡), `ENCORE`면 앵콜(1곡, 선착순 번호 자동 배정) |
+| `verify_submission_pin(submission_id, pin)` | 수정 화면에 들어가기 전 PIN 확인 |
+| `update_submission(submission_id, pin, performers, songs)` | 수정. 앵콜은 번호를 유지한 채 곡만 바꿈 |
+| `delete_submission(submission_id, pin)` | 삭제 · 앵콜 취소 |
+| `reorder_entries(event_id, is_encore, entry_ids)` | 관리자 전용. 목록 순서대로 01부터 번호를 다시 매김 |
+
+| 오류 코드 | 의미 |
+| --- | --- |
+| `EVENT_NOT_FOUND` · `SUBMISSION_NOT_FOUND` | 행사 · 신청 없음 |
+| `SUBMISSION_CLOSED` | 지금 단계에서는 신청할 수 없음 |
+| `NOT_EDITABLE` | 지금은 수정할 수 없음 (본 공연은 모집 마감 후, 앵콜은 차례 시작 후 · 종료 후) |
+| `INVALID_PIN` | PIN 불일치 |
+| `INVALID_INPUT` | 입력 형식 오류 (PIN 4자리, 공연자 1~10명, 곡 수 등) |
+| `MAIN_SET_NOT_FINISHED` | 본 공연이 끝나기 전에 앵콜을 열려고 함 |
+| `FORBIDDEN` | 관리자가 아님 |
 
 ## 커밋 · PR 규칙
 
