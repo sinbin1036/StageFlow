@@ -1,26 +1,50 @@
 @import "tailwindcss";
 
+/* 색은 세 가지만 쓴다. 동아리 색이 정해지면 이 세 값만 바꾼다. */
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --bg: #d8d8d4;
+  --ink: #111111;
+  --accent: #3ec6c0;
 }
 
 @theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --color-bg: var(--bg);
+  --color-ink: var(--ink);
+  --color-accent: var(--accent);
+  --font-display: var(--font-anton), "Anton", sans-serif;
+  --font-heading: var(--font-black-han-sans), "Black Han Sans", sans-serif;
+  --font-body: var(--font-gothic-a1), "Gothic A1", sans-serif;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+html {
+  background: var(--bg);
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  background: var(--bg);
+  color: var(--ink);
+  font-family: var(--font-gothic-a1), "Gothic A1", sans-serif;
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* 망점(하프톤) 배경: 위쪽에서 아래로 사라진다 */
+.halftone {
+  background-image: radial-gradient(color-mix(in srgb, var(--ink) 22%, transparent) 1.1px, transparent 1.6px);
+  background-size: 7px 7px;
+  mask-image: linear-gradient(to bottom, black, transparent);
+}
+
+/* 오려낸 듯한 카드 가장자리 */
+.cut-edge {
+  clip-path: polygon(0 6%, 9% 0, 38% 4%, 62% 0, 100% 3%, 97% 48%, 100% 100%, 64% 96%, 30% 100%, 0 95%, 3% 52%);
+}
+
+input::placeholder {
+  color: currentColor;
+  opacity: 0.4;
+}
+
+:focus-visible {
+  outline: 3px solid var(--ink);
+  outline-offset: 2px;
 }
