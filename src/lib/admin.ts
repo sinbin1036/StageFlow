@@ -1,5 +1,6 @@
 import "server-only";
 import { redirect } from "next/navigation";
+import { connection } from "next/server";
 import { fetchEventSnapshotById } from "./event-data";
 import { createAuthClient } from "./supabase/server";
 
@@ -9,7 +10,9 @@ export const adminEmail = (loginId: string) => `${loginId.trim().toLowerCase()}@
 export const loginIdOf = (email: string | undefined) => (email ?? "").replace(`@${ADMIN_EMAIL_DOMAIN}`, "");
 
 // 로그인했고 admins에 등록된 사용자만 통과. 아니면 로그인 화면으로 보낸다.
+// 세션 만료를 확인하는 Supabase Auth가 Date.now()를 읽으므로, 미리 렌더링(prefetch)하지 않고 요청 시점에만 실행한다.
 export async function requireAdmin() {
+  await connection();
   const supabase = await createAuthClient();
   const { data } = await supabase.auth.getUser();
   if (!data.user) redirect("/admin/login");
