@@ -179,10 +179,16 @@ export function PublishedView({ snapshot, view }: ViewProps) {
   const mine = view.mainSlots.filter((s) => s.mine);
   return (
     <Screen>
-      <TopBar chip={<Chip>SETLIST OUT</Chip>} />
+      <TopBar chip={<Chip>DRAFT SETLIST</Chip>} />
       <section className="relative px-5 pt-2.5">
         <Display size={118}>SETLIST</Display>
-        <EventHeading meta={eventMeta(snapshot.event)} title={`${snapshot.event.title} 공연 순서`} />
+        <EventHeading meta={eventMeta(snapshot.event)} title={`${snapshot.event.title} 순서 초안`} />
+      </section>
+      <section className="relative px-5 pt-3.5">
+        <div role="status" className="flex items-center gap-2.5 border-2 border-dashed border-ink px-3 py-2.5">
+          <Tag tone="ink">DRAFT</Tag>
+          <span className="text-[13px] font-extrabold leading-snug">순서 초안이에요 · 공연 전까지 바뀔 수 있어요</span>
+        </div>
       </section>
       {mine.length > 0 && (
         <section className="relative px-6 pt-5">
@@ -315,11 +321,33 @@ export function LiveView({ snapshot, view }: ViewProps) {
 }
 
 // ─── 앵콜 (ENCORE) ──────────────────────────────────────────
+// 앵콜은 본 공연이 5곡 이하로 남았을 때 열린다. 남은 본 공연을 먼저 마치고, 앵콜 곡은 신청한 순서대로 그 뒤에 부른다.
+
+function NowBand({ slot }: { slot: SlotView }) {
+  return (
+    <div className="relative flex items-center gap-3 border-y-[3px] border-ink bg-accent px-5 py-3.5">
+      <span className="font-display text-lg tracking-[0.06em]">NOW</span>
+      <span className="font-display text-[28px] leading-none">{slot.no}</span>
+      <span className="flex min-w-0 flex-1 flex-col">
+        <span className="truncate font-heading text-xl leading-tight">{slot.entry.song_title}</span>
+        <span className="truncate text-xs font-extrabold">
+          {slot.entry.is_encore ? "앵콜 · " : ""}
+          {slot.entry.artist} · {slot.performers}
+        </span>
+      </span>
+    </div>
+  );
+}
 
 export function EncoreView({ snapshot, view }: ViewProps) {
-  const { next } = progress(view.encoreSlots);
+  const play = [...view.mainSlots, ...view.encoreSlots];
+  const { current, next } = progress(play);
+  const isWaiting = (s: SlotView) => s.entry.status === "SCHEDULED" || s.entry.status === "CANCELLED";
+  const mainWaiting = view.mainSlots.filter(isWaiting);
+  const mainLeft = mainWaiting.filter((s) => s.entry.status === "SCHEDULED").length;
   const done = view.mainSlots.filter((s) => s.entry.status === "COMPLETED").length;
   const cancelled = view.mainSlots.filter((s) => s.entry.status === "CANCELLED").length;
+  const nextId = next?.entry.id ?? null;
   return (
     <Screen>
       <TopBar chip={<Chip tilt={4}>ENCORE</Chip>} />
@@ -333,16 +361,26 @@ export function EncoreView({ snapshot, view }: ViewProps) {
           <CutLink href={`${base(snapshot)}/apply`} kicker="한 번에 한 곡 · 솔로 · 듀엣 OK" label="앵콜 신청하기" />
         </div>
       </section>
-      <section className="relative flex flex-col px-5">
-        <SectionTitle aside={<span className="text-xs font-extrabold">신청 순 · {view.encoreSlots.length}곡</span>}>
-          ENCORE QUEUE
-        </SectionTitle>
+
+      {current && <NowBand slot={current} />}
+      {current && <NextBand slot={next} />}
+
+      {mainLeft > 0 && (
+        <section className="relative flex flex-col px-5 pt-5">
+          <SectionTitle aside={<span className="text-xs font-extrabold">남은 {mainLeft}곡 · 이어서 진행</span>}>MAIN SET</SectionTitle>
+          <SlotList slots={mainWaiting} nextId={nextId} />
+        </section>
+      )}
+
+      <section className="relative flex flex-col px-5 pt-5">
+        <SectionTitle aside={<span className="text-xs font-extrabold">신청 순 · {view.encoreSlots.length}곡</span>}>ENCORE QUEUE</SectionTitle>
+        {mainLeft > 0 && <p className="pt-2 text-xs font-semibold">본 공연 남은 곡이 끝나면 01번부터 불러요.</p>}
         {view.encoreSlots.length === 0 ? (
           <p className="py-6 text-sm font-semibold">아직 앵콜 신청이 없어요. 먼저 신청하면 먼저 불러요!</p>
         ) : (
           <SlotList
             slots={view.encoreSlots}
-            nextId={next?.entry.id ?? null}
+            nextId={nextId}
             action={(s) =>
               s.entry.status === "SCHEDULED" ? (
                 <Link
@@ -357,19 +395,23 @@ export function EncoreView({ snapshot, view }: ViewProps) {
           />
         )}
       </section>
-      <section className="relative px-5 pb-6 pt-[18px]">
-        <div className="flex items-center justify-between border-2 border-ink px-4 py-3.5 opacity-55">
-          <span className="flex flex-col">
-            <span className="font-display text-lg tracking-[0.02em]">MAIN SET</span>
-            <span className="text-xs font-semibold">
-              본 공연 {done}곡 완료{cancelled ? ` · ${cancelled}곡 취소` : ""}
+
+      {mainLeft === 0 && (
+        <section className="relative px-5 pb-6 pt-[18px]">
+          <div className="flex items-center justify-between border-2 border-ink px-4 py-3.5 opacity-55">
+            <span className="flex flex-col">
+              <span className="font-display text-lg tracking-[0.02em]">MAIN SET</span>
+              <span className="text-xs font-semibold">
+                본 공연 {done}곡 완료{cancelled ? ` · ${cancelled}곡 취소` : ""}
+              </span>
             </span>
-          </span>
-          <svg aria-hidden width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="square">
-            <path d="M5 12l5 5 9-10" />
-          </svg>
-        </div>
-      </section>
+            <svg aria-hidden width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="square">
+              <path d="M5 12l5 5 9-10" />
+            </svg>
+          </div>
+        </section>
+      )}
+      <div className="h-6" />
       <InkFooter kicker="FIRST COME, FIRST SING">
         먼저 신청한 순서대로 공연해요. 곡은 내 차례 전까지 PIN으로 직접 바꿀 수 있고, 순서를 미루고 싶다면 운영진에게 말해 주세요.
       </InkFooter>
@@ -387,12 +429,14 @@ function FinalList({ title, slots }: { title: string; slots: SlotView[] }) {
       <ul>
         {slots.map((s) => {
           const cancelled = s.entry.status === "CANCELLED";
+          const unplayed = s.entry.status === "SCHEDULED" || s.entry.status === "PERFORMING";
           return (
-            <li key={s.entry.id} className={`flex items-baseline gap-3 border-b border-ink py-1.5 ${cancelled ? "opacity-35" : ""}`}>
+            <li key={s.entry.id} className={`flex items-baseline gap-3 border-b border-ink py-1.5 ${cancelled || unplayed ? "opacity-35" : ""}`}>
               <span className="w-[30px] font-display text-lg">{s.no}</span>
               <span className={`min-w-0 flex-1 truncate text-sm font-extrabold ${cancelled ? "line-through" : ""}`}>
                 {s.entry.song_title} <span className="font-semibold">— {s.performers}</span>
               </span>
+              {unplayed && <Tag tone="outline">미공연</Tag>}
               {s.mine && <Tag>MY</Tag>}
             </li>
           );
