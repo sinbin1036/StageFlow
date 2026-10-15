@@ -31,7 +31,7 @@
 ## DB 영향
 - [ ] 없음
 - [ ] 쿼리 / 서버 로직 변경
-- [ ] 테이블 · 컬럼 변경 (`events`, `performance_entries`, `entry_secrets`)
+- [ ] 테이블 · 컬럼 변경 (`events`, `submissions`, `performance_entries`, `submission_secrets`)
 - [ ] 마이그레이션 추가
 - [ ] RLS 정책 변경
 - [ ] Realtime 구독 대상 · 페이로드 변경
@@ -45,7 +45,7 @@
 - [ ] 해당 없음
 - [ ] 참가자 흐름에 로그인 · 회원가입을 요구하지 않음
 - [ ] 관리자 기능은 로그인한 관리자만 실행 가능
-- [ ] PIN 해시(`entry_secrets`)가 공개 조회 · Realtime 응답에 포함되지 않음
+- [ ] PIN 해시(`submission_secrets`)가 공개 조회 · Realtime 응답에 포함되지 않음
 - [ ] PIN 검증은 서버에서만 수행
 
 ## 연관 이슈 / PR
